@@ -1,31 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const { pool } = require('./config/database');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Test database connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err);
-  } else {
-    console.log('✅ Database connected successfully!');
-  }
-});
+// Import routes
+const usersRoutes = require('./routes/users');
 
 // Health check
 app.get('/', (req, res) => {
@@ -34,11 +20,24 @@ app.get('/', (req, res) => {
     message: '🌊 LinkWavez API is running! 🚀',
     app: 'LinkWavez',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      users: '/api/users',
+      clips: '/api/clips',
+      categories: '/api/categories',
+      businesses: '/api/businesses'
+    }
   });
 });
 
-// Get all wisdom clips
+// ========================================
+// USER ROUTES
+// ========================================
+app.use('/api/users', usersRoutes);
+
+// ========================================
+// WISDOM CLIPS ROUTES
+// ========================================
 app.get('/api/clips', async (req, res) => {
   try {
     const result = await pool.query(
@@ -59,7 +58,9 @@ app.get('/api/clips', async (req, res) => {
   }
 });
 
-// Get categories
+// ========================================
+// CATEGORY ROUTES
+// ========================================
 app.get('/api/categories', async (req, res) => {
   try {
     const result = await pool.query(
@@ -68,6 +69,7 @@ app.get('/api/categories', async (req, res) => {
     
     res.json({
       status: 'success',
+      count: result.rows.length,
       data: result.rows
     });
   } catch (error) {
@@ -79,7 +81,9 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
-// Get businesses
+// ========================================
+// BUSINESS ROUTES
+// ========================================
 app.get('/api/businesses', async (req, res) => {
   try {
     const result = await pool.query(
@@ -100,7 +104,58 @@ app.get('/api/businesses', async (req, res) => {
   }
 });
 
-// Start server
+app.get('/api/businesses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM businesses WHERE id = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Business not found'
+      });
+    }
+    
+    res.json({
+      status: 'success',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+});
+
+// ========================================
+// ERROR HANDLING
+// ========================================
+app.use((req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: 'Endpoint not found',
+    path: req.path
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// ========================================
+// START SERVER
+// ========================================
 app.listen(port, () => {
   console.log(`🌊 LinkWavez API running on port ${port}`);
+  console.log(`📍 http://localhost:${port}`);
 });
