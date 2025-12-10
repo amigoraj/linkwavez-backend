@@ -1,20 +1,24 @@
-const { Pool } = require('pg');
+// config/database.js
+// Centralized Supabase Configuration
+
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
+// Validate environment variables
+if (!process.env.SUPABASE_URL) {
+  throw new Error('Missing SUPABASE_URL in .env file');
+}
 
-// Test connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err);
-  } else {
-    console.log('✅ Database connected successfully!');
-  }
-});
+if (!process.env.SUPABASE_KEY) {
+  throw new Error('Missing SUPABASE_KEY in .env file');
+}
 
-module.exports = { pool };
+// Create and export Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+console.log('✅ Supabase connected successfully!');
+
+module.exports = supabase;
